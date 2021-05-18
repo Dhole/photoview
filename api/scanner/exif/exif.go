@@ -2,6 +2,7 @@ package exif
 
 import (
 	"log"
+	"math"
 
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
@@ -26,6 +27,28 @@ func InitializeEXIFParser() {
 		log.Println("Found exiftool")
 		globalExifParser = exiftoolParser
 	}
+}
+
+// sanitizeFloat overwrites the input value if it's +Inf, -Inf or NaN with a
+// valid real number
+func sanitizeFloat(v *float64) {
+	if math.IsInf(*v, 1) {
+		*v = math.MaxFloat64
+	} else if math.IsInf(*v, -1) {
+		*v = -math.MaxFloat64
+	} else if math.IsNaN(*v) {
+		*v = 0
+	}
+}
+
+// sanitizeEXIF overwrites any exif float64 field if it's +Inf, -Inf or Nan
+// with a valid real number.
+func sanitizeEXIF(exif *models.MediaEXIF) {
+	sanitizeFloat(exif.Exposure)
+	sanitizeFloat(exif.Aperture)
+	sanitizeFloat(exif.FocalLength)
+	sanitizeFloat(exif.GPSLatitude)
+	sanitizeFloat(exif.GPSLongitude)
 }
 
 // SaveEXIF scans the media file for exif metadata and saves it in the database if found
@@ -56,6 +79,7 @@ func SaveEXIF(tx *gorm.DB, media *models.Media) (*models.MediaEXIF, error) {
 	if exif == nil {
 		return nil, nil
 	}
+	sanitizeEXIF(exif)
 
 	// Add EXIF to database and link to media
 	if err := tx.Model(&media).Association("Exif").Replace(exif); err != nil {
