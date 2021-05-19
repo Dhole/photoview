@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/photoview/photoview/api/graphql/models"
 	"github.com/photoview/photoview/api/scanner/scanner_cache"
@@ -249,6 +250,18 @@ func directoryContainsPhotos(rootPath string, cache *scanner_cache.AlbumScannerC
 
 		for _, fileInfo := range dirContent {
 			filePath := path.Join(dirPath, fileInfo.Name())
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+				resolvedFilePath, err := filepath.EvalSymlinks(filePath)
+				if err != nil {
+					scanner_utils.ScannerError("Failed to resolve symlink (%v): %v", filePath, err)
+					continue
+				}
+				fileInfo, err = os.Lstat(resolvedFilePath)
+				if err != nil {
+					scanner_utils.ScannerError("Failed stat path (%v): %v", resolvedFilePath, err)
+					continue
+				}
+			}
 			if fileInfo.IsDir() {
 				scanQueue.PushBack(filePath)
 			} else {

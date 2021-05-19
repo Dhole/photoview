@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/photoview/photoview/api/graphql/models"
@@ -170,6 +171,7 @@ func findMediaForAlbum(album *models.Album, cache *scanner_cache.AlbumScannerCac
 
 	albumPhotos := make([]*models.Media, 0)
 
+	fmt.Printf("DBG >>> findMediaForAlbum %s\n", album.Path)
 	dirContent, err := ioutil.ReadDir(album.Path)
 	if err != nil {
 		return nil, err
@@ -180,6 +182,19 @@ func findMediaForAlbum(album *models.Album, cache *scanner_cache.AlbumScannerCac
 
 	for _, item := range dirContent {
 		photoPath := path.Join(album.Path, item.Name())
+		if item.Mode()&os.ModeSymlink != 0 {
+			resolvedFilePath, err := filepath.EvalSymlinks(photoPath)
+			if err != nil {
+				scanner_utils.ScannerError("Failed to resolve symlink (%v): %v", photoPath, err)
+				continue
+			}
+			photoPath = resolvedFilePath
+			item, err = os.Lstat(photoPath)
+			if err != nil {
+				scanner_utils.ScannerError("Failed stat path (%v): %v", photoPath, err)
+				continue
+			}
+		}
 
 		if !item.IsDir() && cache.IsPathMedia(photoPath) {
 			// Match file against ignore data

@@ -113,7 +113,8 @@ func SetupDatabase() (*gorm.DB, error) {
 
 	// Configure database logging
 	if utils.DevelopmentMode() {
-		config.Logger = logger.Default.LogMode(logger.Info)
+		// config.Logger = logger.Default.LogMode(logger.Info)
+		config.Logger = logger.Default.LogMode(logger.Warn)
 	} else {
 		config.Logger = logger.Default.LogMode(logger.Warn)
 	}
